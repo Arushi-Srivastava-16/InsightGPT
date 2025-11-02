@@ -22,8 +22,27 @@ from langchain_neo4j import Neo4jGraph
 try:
     from langchain_community.graphs.graph_document import GraphDocument, Node, Relationship
 except ImportError:
-    # Fallback for older versions
-    from langchain_core.graph_transformers import GraphDocument, Node, Relationship
+    try:
+        from langchain_experimental.graph_transformers import GraphDocument, Node, Relationship
+    except ImportError:
+        # Last fallback - define our own
+        from pydantic import Field
+        
+        class Relationship(BaseModel):
+            source: Any
+            target: Any
+            type: str
+            properties: dict = Field(default_factory=dict)
+        
+        class Node(BaseModel):
+            id: str
+            type: str
+            properties: dict = Field(default_factory=dict)
+        
+        class GraphDocument(BaseModel):
+            nodes: List[Node] = Field(default_factory=list)
+            relationships: List[Relationship] = Field(default_factory=list)
+            source: Any = None
 
 # Load configurations
 def load_config():
