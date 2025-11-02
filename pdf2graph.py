@@ -19,7 +19,11 @@ except ImportError:
     print("WARNING: unstructured library not available. Will use fallback PDF processing.")
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_neo4j import Neo4jGraph
-from langchain_community.graphs.graph_document import GraphDocument, Node, Relationship
+try:
+    from langchain_community.graphs.graph_document import GraphDocument, Node, Relationship
+except ImportError:
+    # Fallback for older versions
+    from langchain_core.graph_transformers import GraphDocument, Node, Relationship
 
 # Load configurations
 def load_config():
