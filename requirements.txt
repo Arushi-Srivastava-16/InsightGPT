@@ -1,17 +1,42 @@
-json_repair
-langchain
-langchain_community
-langchain_core
-langchain_experimental
-langchain_openai
-pydantic
-pyzotero
-unstructured[all-docs]
-pytesseract
-ollama 
-chromadb
-pytesseract
-pdfminer
+# Core dependencies
+pydantic>=2.0.0
 numpy==1.26.3
+
+# LangChain ecosystem
+langchain
+langchain-community
+langchain-core
+langchain-experimental
+langchain-openai
+langchain-neo4j
+
+# LLM providers
+ollama
+
+# Database & vector stores
 neo4j
+chromadb
+
+# PDF processing
+unstructured[all-docs]
+pdfminer.six
+
+# Image processing & OCR
 opencv-python-headless>=4.8.0.76
+pytesseract
+
+# Data processing
+json_repair
+
+# Reference management
+pyzotero
+
+# Visualization (for Streamlit app)
+streamlit
+pandas
+networkx
+pyvis
+plotly
+
+# Configuration management
+python-dotenv

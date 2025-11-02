@@ -1,0 +1,338 @@
+================================================================================
+🔑 InsightGPT - API Keys & Setup Guide
+================================================================================
+
+QUICK SUMMARY:
+--------------
+You need to set up:
+1. Neo4j (REQUIRED) - FREE
+2. Either Ollama (FREE) OR OpenAI (PAID)
+3. Zotero (OPTIONAL) - FREE
+
+================================================================================
+📋 STEP-BY-STEP GUIDE
+================================================================================
+
+STEP 1: Create .env File
+-------------------------
+Location: config/.env
+
+Windows Command:
+  copy config\env.template config\.env
+
+Then edit config\.env with a text editor (Notepad, VS Code, etc.)
+
+
+STEP 2: Neo4j Setup (REQUIRED - FREE)
+--------------------------------------
+What: Graph database for storing knowledge
+
+Download: https://neo4j.com/download/
+
+Steps:
+1. Install Neo4j Desktop
+2. Create New Project
+3. Add Local DBMS
+4. Set a password (e.g., "myPassword123")
+5. Install APOC plugin (in plugins tab)
+6. Start the database
+
+Add to .env:
+  NEO4J_URI=bolt://localhost:7687
+  NEO4J_USERNAME=neo4j
+  NEO4J_PASSWORD=myPassword123         ← Your password here
+
+
+STEP 3A: Ollama Setup (RECOMMENDED - FREE)
+-------------------------------------------
+What: Run AI models locally on your computer
+Cost: 100% FREE
+Privacy: All data stays on your machine
+
+Download: https://ollama.com
+
+Steps:
+1. Install Ollama
+2. Open terminal/command prompt
+3. Run these commands:
+   ollama pull hermes-2-pro-llama-3-8b
+   ollama pull mxbai-embed-large
+
+Add to .env:
+  LLM_PROVIDER=ollama
+  OLLAMA_MODEL=hermes-2-pro-llama-3-8b
+  OLLAMA_EMBEDDING_MODEL=mxbai-embed-large
+  EMBEDDINGS_PROVIDER=ollama
+  CHAT_PROVIDER=ollama
+
+
+STEP 3B: OpenAI Setup (ALTERNATIVE - PAID)
+-------------------------------------------
+What: Use GPT-3.5 or GPT-4 (cloud AI)
+Cost: ~$0.50 per paper (pay-as-you-go)
+
+Get API Key: https://platform.openai.com/api-keys
+
+Steps:
+1. Create OpenAI account
+2. Add payment method
+3. Create API key
+4. Copy the key (starts with "sk-...")
+
+Add to .env:
+  LLM_PROVIDER=openai
+  OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxx  ← Your key here
+  OPENAI_MODEL=gpt-3.5-turbo
+  OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+  EMBEDDINGS_PROVIDER=openai
+  CHAT_PROVIDER=openai
+
+Pricing:
+- GPT-3.5-turbo: $0.0005 per 1K tokens (~$0.50/1M tokens)
+- GPT-4: $0.03 per 1K tokens
+- Embeddings: $0.00013 per 1K tokens
+- Typical usage: $5-20/month for regular use
+
+
+STEP 4: Zotero Setup (OPTIONAL - FREE)
+---------------------------------------
+What: Import PDFs from your Zotero library
+Cost: FREE
+
+Get API Key: https://www.zotero.org/settings/keys
+
+Steps:
+1. Log in to Zotero
+2. Go to Settings → Feeds/API
+3. Find your User ID
+4. Create a new API key (read permissions)
+5. Find your Zotero storage folder
+
+Add to .env:
+  ZOTERO_ENABLED=true
+  ZOTERO_LIBRARY_ID=12345678              ← Your User ID
+  ZOTERO_LIBRARY_TYPE=user
+  ZOTERO_API_KEY=xxxxxxxxxxxxx            ← Your API key
+  ZOTERO_STORAGE_DIR=C:\Users\YourName\Zotero\storage\
+
+
+================================================================================
+💰 COST COMPARISON
+================================================================================
+
+Setup Option              Neo4j    AI Provider        Total Cost
+-------------             ------   --------------     -----------
+FREE (Recommended)        FREE     Ollama (FREE)      $0/month ✅
+PAID (Better Quality)     FREE     OpenAI (Paid)      $5-20/month 💵
+HYBRID                    FREE     Both (Mixed)       $2-10/month 💵
+
+
+RECOMMENDATION: Start with FREE (Ollama), upgrade to OpenAI if you need
+better quality or faster responses.
+
+
+================================================================================
+📝 EXAMPLE .env FILE (FREE SETUP)
+================================================================================
+
+# Neo4j Database
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=mySecurePassword123
+
+# LLM Provider (Ollama - Free)
+LLM_PROVIDER=ollama
+LLM_TEMPERATURE=0.0
+LLM_MAX_TOKENS=2048
+
+# Ollama Models
+OLLAMA_MODEL=hermes-2-pro-llama-3-8b
+OLLAMA_EMBEDDING_MODEL=mxbai-embed-large
+OLLAMA_NUM_CTX=2048
+
+# Embeddings
+EMBEDDINGS_PROVIDER=ollama
+
+# Chat
+CHAT_PROVIDER=ollama
+CHAT_MODEL=hermes-2-pro-llama-3-8b
+CHAT_TEMPERATURE=0.8
+
+# Zotero (Optional - Disabled)
+ZOTERO_ENABLED=false
+
+# PDF Settings
+PDF_EXTRACT_IMAGES=false
+PDF_MAX_CHAR=1000
+PDF_NEW_AFTER_N_CHARS=800
+PDF_COMBINE_TEXT_UNDER_N_CHARS=200
+
+
+================================================================================
+📝 EXAMPLE .env FILE (OPENAI SETUP)
+================================================================================
+
+# Neo4j Database
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=mySecurePassword123
+
+# LLM Provider (OpenAI - Paid)
+LLM_PROVIDER=openai
+LLM_TEMPERATURE=0.0
+LLM_MAX_TOKENS=2048
+
+# OpenAI Configuration
+OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+OPENAI_MODEL=gpt-3.5-turbo
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+
+# Embeddings
+EMBEDDINGS_PROVIDER=openai
+
+# Chat
+CHAT_PROVIDER=openai
+CHAT_MODEL=gpt-3.5-turbo
+CHAT_TEMPERATURE=0.8
+
+# Zotero (Optional)
+ZOTERO_ENABLED=false
+
+# PDF Settings
+PDF_EXTRACT_IMAGES=false
+PDF_MAX_CHAR=1000
+
+
+================================================================================
+✅ VERIFICATION CHECKLIST
+================================================================================
+
+Before running the app, verify:
+
+[ ] Created config/.env file
+[ ] Set NEO4J_PASSWORD in .env
+[ ] Neo4j Desktop is running
+[ ] Chosen LLM_PROVIDER (ollama or openai)
+
+If using Ollama:
+[ ] Installed Ollama from https://ollama.com
+[ ] Pulled models: ollama pull hermes-2-pro-llama-3-8b
+[ ] Pulled embeddings: ollama pull mxbai-embed-large
+[ ] Ollama is running
+
+If using OpenAI:
+[ ] Have OPENAI_API_KEY
+[ ] Added API key to .env
+[ ] Have OpenAI credits/payment method
+
+Optional:
+[ ] Zotero API key (if using Zotero)
+
+
+================================================================================
+🚀 RUNNING THE APP
+================================================================================
+
+1. Install dependencies:
+   pip install -r requirements.txt
+
+2. Make sure Neo4j is running
+
+3. If using Ollama, make sure Ollama is running
+
+4. Run the app:
+   streamlit run app.py
+
+5. Open browser:
+   http://localhost:8501
+
+
+================================================================================
+🆘 TROUBLESHOOTING
+================================================================================
+
+Problem: "Cannot find .env file"
+Solution: Make sure file is named .env (not .env.txt)
+          Location should be: config/.env
+
+Problem: "Neo4j connection failed"
+Solution: - Check Neo4j Desktop is running
+          - Verify password in .env matches Neo4j
+          - Check URI: bolt://localhost:7687
+
+Problem: "OpenAI API error"
+Solution: - Verify API key is correct
+          - Check you have credits
+          - Try switching to Ollama (free)
+
+Problem: "Ollama not found"
+Solution: - Install from https://ollama.com
+          - Run: ollama serve
+          - Pull models again
+
+Problem: "Import errors"
+Solution: pip install -r requirements.txt --upgrade
+
+
+================================================================================
+📊 API USAGE & COSTS (OpenAI)
+================================================================================
+
+Typical Usage per Paper:
+- Processing 1 research paper: ~$0.10-0.50
+- Asking 10 questions: ~$0.05-0.10
+- Generating summary: ~$0.05-0.15
+- Total per paper: ~$0.20-0.75
+
+Monthly Estimates:
+- Light use (5 papers/month): ~$2-5
+- Medium use (20 papers/month): ~$5-15
+- Heavy use (50+ papers/month): ~$15-30
+
+Note: With Ollama, all of this is FREE!
+
+
+================================================================================
+🔒 SECURITY TIPS
+================================================================================
+
+1. NEVER commit .env file to Git (already in .gitignore)
+2. Don't share your API keys
+3. Rotate keys if exposed
+4. Use separate keys for dev/production
+5. Monitor API usage regularly
+6. For production, use environment variables or secret managers
+
+
+================================================================================
+📞 NEED HELP?
+================================================================================
+
+Documentation:
+- SETUP.md - Complete setup guide
+- SETUP_COMPLETE.md - Quick reference
+- docs/INSIGHTGPT_GUIDE.md - Full feature guide
+
+Still stuck?
+- Check GitHub Issues
+- Review troubleshooting section above
+- Verify each checklist item
+
+
+================================================================================
+🎉 YOU'RE READY!
+================================================================================
+
+Once you've:
+✓ Created .env file
+✓ Set up Neo4j
+✓ Chosen AI provider (Ollama or OpenAI)
+✓ Installed dependencies
+
+Run: streamlit run app.py
+
+Start uploading PDFs and asking questions! 🚀
+
+
+================================================================================
+

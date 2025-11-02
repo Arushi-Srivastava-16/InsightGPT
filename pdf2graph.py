@@ -19,8 +19,18 @@ from langchain_community.graphs.graph_document import GraphDocument, Node, Relat
 # Load configurations
 def load_config():
     config = ConfigParser()
-    config_path = Path(__file__).parent / "config.ini"
-    config.read(config_path)
+    # Try config directory first, then root
+    config_paths = [
+        Path(__file__).parent / "config" / "config.ini",
+        Path(__file__).parent / "config.ini"
+    ]
+    
+    for config_path in config_paths:
+        if config_path.exists():
+            config.read(config_path)
+            print(f"Loaded config from: {config_path}")
+            break
+    
     return config
 
 config = load_config()
@@ -29,7 +39,13 @@ config = load_config()
 os.environ["NEO4J_URI"] = config["Neo4j"]["uri"]
 os.environ["NEO4J_USERNAME"] = config["Neo4j"]["username"]
 os.environ["NEO4J_PASSWORD"] = config["Neo4j"]["password"]
-graph = Neo4jGraph()
+
+try:
+    graph = Neo4jGraph()
+    print("SUCCESS: Neo4j graph initialized")
+except Exception as e:
+    print(f"WARNING: Could not initialize Neo4j graph: {e}")
+    graph = None
 
 if config["LLM"]["llm"] == "OpenAI":
     from langchain_openai import ChatOpenAI
@@ -65,19 +81,38 @@ def exterat_elements_from_pdf(file_path: str,
     # Define parameters for Unstructured's library
     strategy = "hi_res" # Strategy for analyzing PDFs and extracting table structure
     model_name = "yolox" # Best model for table extraction. Other options are detectron2_onnx and chipper depending on file layout
-    # Extract images, tables, and chunk text
-    raw_pdf_elements = partition_pdf(
-        filename=file_path,
-        extract_images_in_pdf=images,
-        infer_table_structure=True,
-        chunking_strategy="by_title",
-        max_characters=max_char,
-        new_after_n_chars=new_after_n_chars,
-        combine_text_under_n_chars=combine,
-        image_output_dir_path="./",
-        strategy=strategy,
-        model_name=model_name
-    )
+    
+    try:
+        # Extract images, tables, and chunk text
+        raw_pdf_elements = partition_pdf(
+            filename=file_path,
+            extract_images_in_pdf=images,
+            infer_table_structure=True,
+            chunking_strategy="by_title",
+            max_characters=max_char,
+            new_after_n_chars=new_after_n_chars,
+            combine_text_under_n_chars=combine,
+            image_output_dir_path="./",
+            strategy=strategy,
+            model_name=model_name
+        )
+    except Exception as e:
+        if "tesseract" in str(e).lower():
+            print(f"WARNING: Tesseract OCR not available: {e}")
+            print("Falling back to basic text extraction without OCR...")
+            # Fallback to basic extraction without OCR
+            raw_pdf_elements = partition_pdf(
+                filename=file_path,
+                extract_images_in_pdf=False,  # Force disable image extraction
+                infer_table_structure=False,  # Disable table structure inference
+                chunking_strategy="by_title",
+                max_characters=max_char,
+                new_after_n_chars=new_after_n_chars,
+                combine_text_under_n_chars=combine,
+                strategy="fast"  # Use faster strategy without OCR
+            )
+        else:
+            raise e
 
     # Create a dictionary to store counts of each type
     category_counts = {}
@@ -229,14 +264,23 @@ def process_response(document,i,j,metadata) -> GraphDocument:
             # Nodes need to be deduplicated using a set
             rel["head_type"] = rel["head_type"] if rel["head_type"] else "Unknown"
             rel["tail_type"] = rel["tail_type"] if rel["tail_type"] else "Unknown"
-            nodes_set.add((rel["head"], rel["head_type"]))
-            nodes_set.add((rel["tail"], rel["tail_type"]))
+            
+            # Only add to nodes_set if IDs are not None
+            if rel["head"] is not None:
+                nodes_set.add((rel["head"], rel["head_type"]))
+            if rel["tail"] is not None:
+                nodes_set.add((rel["tail"], rel["tail_type"]))
+            # Ensure we have valid IDs before creating nodes
+            if rel["head"] is None or rel["tail"] is None:
+                print(f"Skipping relation with None values: {rel}")
+                continue
+                
             source_node = Node(
-                id=rel["head"],
+                id=str(rel["head"]),
                 type=rel["head_type"]
             )
             target_node = Node(
-                id=rel["tail"],
+                id=str(rel["tail"]),
                 type=rel["tail_type"]
             )
             relationships.append(
@@ -248,8 +292,8 @@ def process_response(document,i,j,metadata) -> GraphDocument:
             )
         except:
             print(f"Error processing relation: {rel}")
-    # Create nodes list
-    nodes = [Node(id=el[0], type=el[1]) for el in list(nodes_set)]
+    # Create nodes list - filter out None values and ensure string ids
+    nodes = [Node(id=str(el[0]), type=el[1]) for el in list(nodes_set) if el[0] is not None]
     return GraphDocument(nodes=nodes, relationships=relationships, source=document)
 
 def flatten_json(y):
@@ -288,11 +332,19 @@ def process_document(file_path: str,
         with open("output.pkl", "wb") as f:
             pickle.dump(text_summaries, f)
         
-    graph.add_graph_documents(text_summaries,
-    baseEntityLabel=True, 
-    include_source=True)
+    if graph:
+        try:
+            graph.add_graph_documents(text_summaries,
+            baseEntityLabel=True, 
+            include_source=True)
+            print("SUCCESS: Graph documents added to Neo4j")
+        except Exception as e:
+            print(f"ERROR: Could not add documents to Neo4j: {e}")
+            raise Exception(f"Neo4j error: {e}")
+    else:
+        raise Exception("Neo4j graph not initialized")
 
-if config["Zotero"]["enabled"]:
+if "Zotero" in config and config["Zotero"]["enabled"]:
     from pyzotero import zotero
     library_id = config["Zotero"]["library_id"]
     library_type = config["Zotero"]["library_type"]
@@ -421,7 +473,7 @@ def cli():
                 except:
                     print("Invalid input.")
         elif action == 'all':
-            if config["Zotero"]["enabled"]:
+            if "Zotero" in config and config["Zotero"]["enabled"]:
                 all_in_zotero()
             else:
                 print("Zotero is not enabled in the configuration file.")
