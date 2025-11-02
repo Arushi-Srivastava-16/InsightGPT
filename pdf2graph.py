@@ -33,40 +33,60 @@ def load_config():
     
     return config
 
-config = load_config()
+# Global variables for lazy initialization
+_config = None
+_graph = None
+_llm = None
 
-# Initialize graph and LLM
-os.environ["NEO4J_URI"] = config["Neo4j"]["uri"]
-os.environ["NEO4J_USERNAME"] = config["Neo4j"]["username"]
-os.environ["NEO4J_PASSWORD"] = config["Neo4j"]["password"]
+def get_config():
+    """Lazy load configuration"""
+    global _config
+    if _config is None:
+        _config = load_config()
+    return _config
 
-try:
-    graph = Neo4jGraph()
-    print("SUCCESS: Neo4j graph initialized")
-except Exception as e:
-    print(f"WARNING: Could not initialize Neo4j graph: {e}")
-    graph = None
+def get_graph():
+    """Lazy load Neo4j graph connection"""
+    global _graph
+    if _graph is None:
+        try:
+            config = get_config()
+            os.environ["NEO4J_URI"] = config["Neo4j"]["uri"]
+            os.environ["NEO4J_USERNAME"] = config["Neo4j"]["username"]
+            os.environ["NEO4J_PASSWORD"] = config["Neo4j"]["password"]
+            _graph = Neo4jGraph()
+            print("SUCCESS: Neo4j graph initialized")
+        except Exception as e:
+            print(f"WARNING: Could not initialize Neo4j graph: {e}")
+            _graph = None
+    return _graph
 
-if config["LLM"]["llm"] == "OpenAI":
-    from langchain_openai import ChatOpenAI
-    openai_params = {
-        "temperature": config["LLM"]["temperature"],
-        "max_tokens": config["LLM"]["max_tokens"],
-        "openai_api_key": config["OpenAI"]["api_key"],
-        "openai_api_base": config["OpenAI"]["api_base"] if "api_base" in config["OpenAI"] else None,
-        "stop": config["LLM"]["stop"],
-    }
-    llm = ChatOpenAI(**openai_params)
-elif config["LLM"]["llm"] == "Ollama":
-    from langchain_community.chat_models import ChatOllama
-    options = {
-        "temperature":config["LLM"]["temperature"],
-        "num_ctx": config["Ollama"]["num_ctx"],
-        "stop": config["LLM"]["stop"],
-    }
-    llm = ChatOllama(model=config["Ollama"]["model"], options=options)
-else:
-    raise ValueError("Invalid LLM model configuration")
+def get_llm():
+    """Lazy load LLM"""
+    global _llm
+    if _llm is None:
+        config = get_config()
+        if config["LLM"]["llm"] == "OpenAI":
+            from langchain_openai import ChatOpenAI
+            openai_params = {
+                "temperature": config["LLM"]["temperature"],
+                "max_tokens": config["LLM"]["max_tokens"],
+                "openai_api_key": config["OpenAI"]["api_key"],
+                "openai_api_base": config["OpenAI"]["api_base"] if "api_base" in config["OpenAI"] else None,
+                "stop": config["LLM"]["stop"],
+            }
+            _llm = ChatOpenAI(**openai_params)
+        elif config["LLM"]["llm"] == "Ollama":
+            from langchain_community.chat_models import ChatOllama
+            options = {
+                "temperature":config["LLM"]["temperature"],
+                "num_ctx": config["Ollama"]["num_ctx"],
+                "stop": config["LLM"]["stop"],
+            }
+            _llm = ChatOllama(model=config["Ollama"]["model"], options=options)
+        else:
+            raise ValueError("Invalid LLM model configuration")
+    return _llm
 
 class Element(BaseModel):
     type: str
@@ -280,14 +300,19 @@ IMPORTANT NOTES:\n- Each key must have a valid value, 'null' is not allowed. \n-
     return chat_prompt
 
 prompt = create_prompt()
-llm_transformer = LLMGraphTransformer(llm=llm, prompt=prompt)
-json_repair = json_repair
-chain = prompt | llm 
+
+def get_llm_transformer():
+    """Lazy load LLM transformer"""
+    return LLMGraphTransformer(llm=get_llm(), prompt=prompt)
+
+def get_chain():
+    """Lazy load chain"""
+    return prompt | get_llm() 
 
 def process_response(document,i,j,metadata) -> GraphDocument:
     print(f"processing document {i} out of {j}")
     
-    raw_schema=chain.invoke({"input": document.page_content})
+    raw_schema=get_chain().invoke({"input": document.page_content})
     parsed_json = json_repair.loads(raw_schema.content)
 
     nodes_set = set()
@@ -366,6 +391,7 @@ def process_document(file_path: str,
         with open("output.pkl", "wb") as f:
             pickle.dump(text_summaries, f)
         
+    graph = get_graph()
     if graph:
         try:
             graph.add_graph_documents(text_summaries,
@@ -378,6 +404,7 @@ def process_document(file_path: str,
     else:
         raise Exception("Neo4j graph not initialized")
 
+config = get_config()
 if "Zotero" in config and config["Zotero"]["enabled"]:
     from pyzotero import zotero
     library_id = config["Zotero"]["library_id"]

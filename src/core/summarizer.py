@@ -19,58 +19,75 @@ from src.utils.config_loader import (
     get_llm_config,
 )
 
-# Load configuration from .env / config.ini
-config = load_env_config(use_env=True)
+# Global variables for lazy initialization
+_graph = None
+_llm = None
+_config = None
 
-# Initialize Neo4j
-neo4j_cfg = get_neo4j_config()
-os.environ["NEO4J_URI"] = neo4j_cfg["uri"]
-os.environ["NEO4J_USERNAME"] = neo4j_cfg["username"]
-os.environ["NEO4J_PASSWORD"] = neo4j_cfg["password"]
-try:
-    graph = Neo4jGraph(
-        url=neo4j_cfg["uri"],
-        username=neo4j_cfg["username"],
-        password=neo4j_cfg["password"],
-        database=os.getenv("NEO4J_DATABASE", None),
-    )
-except Exception as e:
-    print(f"Warning: Could not initialize Neo4j connection: {e}")
-    graph = None
+def get_config():
+    """Lazy load configuration"""
+    global _config
+    if _config is None:
+        _config = load_env_config(use_env=True)
+    return _config
 
-# Initialize LLM
-llm_cfg = get_llm_config()
-if llm_cfg["provider"].lower() == "openai":
-    from langchain_openai import ChatOpenAI
-    openai_params = {
-        "temperature": float(llm_cfg.get("temperature", 0.0)),
-        # Lower max_tokens for faster responses
-        "max_tokens": int(llm_cfg.get("max_tokens", 512)),
-        # Add timeouts/retries to prevent long hangs
-        "request_timeout": int(llm_cfg.get("request_timeout", 40)),
-        "max_retries": int(llm_cfg.get("max_retries", 1)),
-        "openai_api_key": llm_cfg.get("api_key", ""),
-        "model": llm_cfg.get("model", "gpt-3.5-turbo"),
-    }
-    if "api_base" in llm_cfg and llm_cfg.get("api_base"):
-        openai_params["openai_api_base"] = llm_cfg["api_base"]
-    llm = ChatOpenAI(**openai_params)
-elif llm_cfg["provider"].lower() == "ollama":
-    from langchain_community.chat_models import ChatOllama
-    options = {
-        "temperature": float(llm_cfg.get("temperature", 0.0)),
-        "num_ctx": int(llm_cfg.get("num_ctx", 2048)),
-    }
-    llm = ChatOllama(model=llm_cfg.get("model", "hermes-2-pro-llama-3-8b"), options=options)
-else:
-    raise ValueError("Invalid LLM model configuration")
+def get_graph():
+    """Lazy load Neo4j graph connection"""
+    global _graph
+    if _graph is None:
+        try:
+            neo4j_cfg = get_neo4j_config()
+            os.environ["NEO4J_URI"] = neo4j_cfg["uri"]
+            os.environ["NEO4J_USERNAME"] = neo4j_cfg["username"]
+            os.environ["NEO4J_PASSWORD"] = neo4j_cfg["password"]
+            _graph = Neo4jGraph(
+                url=neo4j_cfg["uri"],
+                username=neo4j_cfg["username"],
+                password=neo4j_cfg["password"],
+                database=os.getenv("NEO4J_DATABASE", None),
+            )
+        except Exception as e:
+            print(f"Warning: Could not initialize Neo4j connection: {e}")
+            _graph = None
+    return _graph
+
+def get_llm():
+    """Lazy load LLM"""
+    global _llm
+    if _llm is None:
+        llm_cfg = get_llm_config()
+        if llm_cfg["provider"].lower() == "openai":
+            from langchain_openai import ChatOpenAI
+            openai_params = {
+                "temperature": float(llm_cfg.get("temperature", 0.0)),
+                # Lower max_tokens for faster responses
+                "max_tokens": int(llm_cfg.get("max_tokens", 512)),
+                # Add timeouts/retries to prevent long hangs
+                "request_timeout": int(llm_cfg.get("request_timeout", 40)),
+                "max_retries": int(llm_cfg.get("max_retries", 1)),
+                "openai_api_key": llm_cfg.get("api_key", ""),
+                "model": llm_cfg.get("model", "gpt-3.5-turbo"),
+            }
+            if "api_base" in llm_cfg and llm_cfg.get("api_base"):
+                openai_params["openai_api_base"] = llm_cfg["api_base"]
+            _llm = ChatOpenAI(**openai_params)
+        elif llm_cfg["provider"].lower() == "ollama":
+            from langchain_community.chat_models import ChatOllama
+            options = {
+                "temperature": float(llm_cfg.get("temperature", 0.0)),
+                "num_ctx": int(llm_cfg.get("num_ctx", 2048)),
+            }
+            _llm = ChatOllama(model=llm_cfg.get("model", "hermes-2-pro-llama-3-8b"), options=options)
+        else:
+            raise ValueError("Invalid LLM model configuration")
+    return _llm
 
 
 class ResearchSummarizer:
     """Summarizes research documents using map-reduce approach"""
     
     def __init__(self, llm=None):
-        self.llm = llm or globals()['llm']
+        self.llm = llm or get_llm()
         self.map_prompt = PromptTemplate(
             template="""You are analyzing a section of a research paper.
             
@@ -166,6 +183,9 @@ Final Summary:""",
             RETURN n.text as text, coalesce(n.source, 'unknown') as source
             LIMIT 5
             """
+            graph = get_graph()
+            if graph is None:
+                return "Neo4j database not available."
             results = graph.query(query, {"title": paper_title})
         elif source:
             # Search by source
@@ -175,6 +195,9 @@ Final Summary:""",
             RETURN n.text as text, n.source as source
             LIMIT 5
             """
+            graph = get_graph()
+            if graph is None:
+                return "Neo4j database not available."
             results = graph.query(query, {"source": source})
         else:
             # Get all Document nodes with text first
@@ -185,6 +208,9 @@ Final Summary:""",
             RETURN n.text as text, coalesce(n.source, 'document') as source
             LIMIT 5
             """
+            graph = get_graph()
+            if graph is None:
+                return "Neo4j database not available."
             results = graph.query(query)
         
         if not results:
@@ -280,7 +306,7 @@ class CitationExtractor:
     """Extract and manage citations from research papers"""
     
     def __init__(self, llm=None):
-        self.llm = llm or globals()['llm']
+        self.llm = llm or get_llm()
         self.citation_prompt = PromptTemplate(
             template="""Extract all citations from this text. For each citation, identify:
 - Authors
@@ -322,6 +348,10 @@ Citations:""",
             source_paper: The paper that contains citations
             citations: List of citation dictionaries
         """
+        graph = get_graph()
+        if graph is None:
+            return
+        
         # Create or merge the source paper node
         graph.query("""
             MERGE (p:Paper {title: $title})
@@ -344,6 +374,10 @@ Citations:""",
     
     def get_citation_network(self, paper_title: str) -> Dict[str, Any]:
         """Get citation network for a paper"""
+        graph = get_graph()
+        if graph is None:
+            return {"paper": paper_title, "citations": [], "citation_count": 0}
+        
         query = """
         MATCH (p:Paper {title: $title})-[r:CITES]->(c:Citation)
         RETURN c.text as citation, r.context as context
@@ -361,10 +395,20 @@ class LiteratureGraphBuilder:
     """Build and query literature knowledge graphs"""
     
     def __init__(self):
-        self.graph = graph
+        self.graph = None
+    
+    def _get_graph(self):
+        """Get graph instance"""
+        if self.graph is None:
+            self.graph = get_graph()
+        return self.graph
     
     def build_paper_relationships(self):
         """Create relationships between papers based on shared entities"""
+        graph = self._get_graph()
+        if graph is None:
+            return []
+        
         query = """
         // Find papers that share entities
         MATCH (p1:Paper)-[:MENTIONS]->(e:__Entity__)<-[:MENTIONS]-(p2:Paper)
@@ -376,11 +420,15 @@ class LiteratureGraphBuilder:
             r.similarity_count = size(shared_entities)
         RETURN count(r) as relationships_created
         """
-        result = self.graph.query(query)
+        result = graph.query(query)
         return result
     
     def get_literature_map(self, topic: str = None) -> Dict[str, Any]:
         """Get literature map for visualization"""
+        graph = self._get_graph()
+        if graph is None:
+            return {"papers": [], "topic": topic}
+        
         if topic:
             query = """
             MATCH (e:__Entity__ {id: $topic})<-[:MENTIONS]-(p:Paper)
@@ -390,7 +438,7 @@ class LiteratureGraphBuilder:
                    count(r) as connection_count
             LIMIT 20
             """
-            results = self.graph.query(query, {"topic": topic})
+            results = graph.query(query, {"topic": topic})
         else:
             query = """
             MATCH (p:Paper)
@@ -400,7 +448,7 @@ class LiteratureGraphBuilder:
                    count(r) as connection_count
             LIMIT 20
             """
-            results = self.graph.query(query)
+            results = graph.query(query)
         
         return {
             "papers": results,
