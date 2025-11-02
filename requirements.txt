@@ -1,6 +1,6 @@
 # Core dependencies
 pydantic>=2.0.0
-numpy==1.26.3
+numpy>=1.21.0,<2.0.0
 
 # LangChain ecosystem
 langchain
@@ -18,13 +18,16 @@ neo4j
 chromadb
 
 # PDF processing (Streamlit Cloud compatible)
-unstructured[pdf]
+# Use fallback libraries first to avoid unstructured conflicts
+pymupdf>=4.21.0
+pypdf>=3.0.0
 pdfminer.six
-pymupdf
-pypdf
+# Unstructured is optional, will fallback if not available
+unstructured[pdf]
+ml-dtypes>=0.5.0
 
 # Image processing & OCR (Streamlit Cloud compatible)
-opencv-python-headless==4.8.0.76
+opencv-python-headless>=4.8.0.76
 pytesseract
 
 # Data processing
