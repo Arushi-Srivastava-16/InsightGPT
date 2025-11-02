@@ -26,6 +26,7 @@ else:
 def get_env(key: str, default: Any = None) -> Any:
     """
     Get environment variable with fallback to default
+    Supports Streamlit secrets when running in Streamlit
     
     Args:
         key: Environment variable name
@@ -34,7 +35,20 @@ def get_env(key: str, default: Any = None) -> Any:
     Returns:
         Environment variable value or default
     """
-    return os.getenv(key, default)
+    # First try environment variables
+    value = os.getenv(key)
+    if value is not None:
+        return value
+    
+    # Try Streamlit secrets if available
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and key in st.secrets:
+            return st.secrets[key]
+    except (ImportError, AttributeError, KeyError):
+        pass
+    
+    return default
 
 
 def get_env_bool(key: str, default: bool = False) -> bool:

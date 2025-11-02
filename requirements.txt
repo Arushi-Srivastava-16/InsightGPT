@@ -17,12 +17,14 @@ ollama
 neo4j
 chromadb
 
-# PDF processing
-unstructured[all-docs]
+# PDF processing (Streamlit Cloud compatible)
+unstructured[pdf]
 pdfminer.six
+pymupdf
+pypdf
 
-# Image processing & OCR
-opencv-python-headless>=4.8.0.76
+# Image processing & OCR (Streamlit Cloud compatible)
+opencv-python-headless==4.8.0.76
 pytesseract
 
 # Data processing

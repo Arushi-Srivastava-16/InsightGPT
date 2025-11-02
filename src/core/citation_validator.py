@@ -5,44 +5,66 @@ Validates citation accuracy and formatting
 import os
 import re
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from src.utils.config_loader import load_config as load_env_config, get_llm_config
 from langchain_neo4j import Neo4jGraph
-# Load config
 
+# Global variables for lazy initialization
+_graph = None
+_llm = None
+_config = None
 
-config = load_env_config(use_env=True)
+def get_config():
+    """Lazy load configuration"""
+    global _config
+    if _config is None:
+        _config = load_env_config(use_env=True)
+    return _config
 
-# Initialize Neo4j from the merged config
-os.environ["NEO4J_URI"] = config["Neo4j"]["uri"]
-os.environ["NEO4J_USERNAME"] = config["Neo4j"]["username"]
-os.environ["NEO4J_PASSWORD"] = config["Neo4j"]["password"]
-graph = Neo4jGraph()
+def get_graph():
+    """Lazy load Neo4j graph connection"""
+    global _graph
+    if _graph is None:
+        try:
+            config = get_config()
+            # Set environment variables for Neo4j
+            os.environ["NEO4J_URI"] = config["Neo4j"]["uri"]
+            os.environ["NEO4J_USERNAME"] = config["Neo4j"]["username"]
+            os.environ["NEO4J_PASSWORD"] = config["Neo4j"]["password"]
+            _graph = Neo4jGraph()
+        except Exception as e:
+            print(f"Warning: Could not initialize Neo4j connection: {e}")
+            _graph = None
+    return _graph
 
-# Initialize LLM (consistent with summarizer/get_llm_config)
-llm_cfg = get_llm_config()
-if llm_cfg["provider"].lower() == "openai":
-    from langchain_openai import ChatOpenAI
-    openai_params = {
-        "temperature": float(llm_cfg.get("temperature", 0.0)),
-        "max_tokens": int(llm_cfg.get("max_tokens", 2048)),
-        "openai_api_key": llm_cfg.get("api_key", ""),
-        "model": llm_cfg.get("model", "gpt-3.5-turbo"),
-    }
-    if "api_base" in llm_cfg and llm_cfg.get("api_base"):
-        openai_params["openai_api_base"] = llm_cfg["api_base"]
-    llm = ChatOpenAI(**openai_params)
-elif llm_cfg["provider"].lower() == "ollama":
-    from langchain_community.chat_models import ChatOllama
-    options = {
-        "temperature": float(llm_cfg.get("temperature", 0.0)),
-        "num_ctx": int(llm_cfg.get("num_ctx", 2048)),
-    }
-    llm = ChatOllama(model=llm_cfg.get("model", "hermes-2-pro-llama-3-8b"), options=options)
-else:
-    raise ValueError("Invalid LLM model configuration: provider should be 'openai' or 'ollama'")
+def get_llm():
+    """Lazy load LLM"""
+    global _llm
+    if _llm is None:
+        llm_cfg = get_llm_config()
+        if llm_cfg["provider"].lower() == "openai":
+            from langchain_openai import ChatOpenAI
+            openai_params = {
+                "temperature": float(llm_cfg.get("temperature", 0.0)),
+                "max_tokens": int(llm_cfg.get("max_tokens", 2048)),
+                "openai_api_key": llm_cfg.get("api_key", ""),
+                "model": llm_cfg.get("model", "gpt-3.5-turbo"),
+            }
+            if "api_base" in llm_cfg and llm_cfg.get("api_base"):
+                openai_params["openai_api_base"] = llm_cfg["api_base"]
+            _llm = ChatOpenAI(**openai_params)
+        elif llm_cfg["provider"].lower() == "ollama":
+            from langchain_community.chat_models import ChatOllama
+            options = {
+                "temperature": float(llm_cfg.get("temperature", 0.0)),
+                "num_ctx": int(llm_cfg.get("num_ctx", 2048)),
+            }
+            _llm = ChatOllama(model=llm_cfg.get("model", "hermes-2-pro-llama-3-8b"), options=options)
+        else:
+            raise ValueError("Invalid LLM model configuration: provider should be 'openai' or 'ollama'")
+    return _llm
 
 
 class CitationValidator:
@@ -51,8 +73,8 @@ class CitationValidator:
     """
     
     def __init__(self, llm=None):
-        self.llm = llm or globals()['llm']
-        self.graph = graph
+        self.llm = llm or get_llm()
+        self.graph = get_graph()
         
         # Citation format patterns
         self.citation_patterns = {

@@ -78,40 +78,74 @@ def exterat_elements_from_pdf(file_path: str,
                               max_char: int = 1000, 
                               new_after_n_chars: int = 800,
                               combine: int = 200,) -> List[Document]:
-    # Define parameters for Unstructured's library
-    strategy = "hi_res" # Strategy for analyzing PDFs and extracting table structure
-    model_name = "yolox" # Best model for table extraction. Other options are detectron2_onnx and chipper depending on file layout
+    
+    # Check if we're running on Streamlit Cloud (or similar environment)
+    import os
+    is_cloud_env = os.getenv('STREAMLIT_SHARING_MODE') or os.getenv('STREAMLIT_CLOUD') or 'streamlit' in os.getcwd().lower()
+    
+    if is_cloud_env or images == False:
+        # Use cloud-compatible settings (no OCR, no computer vision models)
+        strategy = "fast"
+        model_name = None
+        extract_images = False
+        infer_tables = False
+        print("INFO: Using cloud-compatible PDF processing (fast mode, no OCR)")
+    else:
+        # Use full-featured settings for local development
+        strategy = "hi_res"
+        model_name = "yolox"
+        extract_images = images
+        infer_tables = True
+        print("INFO: Using full-featured PDF processing (hi-res mode with OCR)")
     
     try:
-        # Extract images, tables, and chunk text
+        # Extract text and chunk it
         raw_pdf_elements = partition_pdf(
             filename=file_path,
-            extract_images_in_pdf=images,
-            infer_table_structure=True,
+            extract_images_in_pdf=extract_images,
+            infer_table_structure=infer_tables,
             chunking_strategy="by_title",
             max_characters=max_char,
             new_after_n_chars=new_after_n_chars,
             combine_text_under_n_chars=combine,
-            image_output_dir_path="./",
+            image_output_dir_path="./" if extract_images else None,
             strategy=strategy,
             model_name=model_name
         )
+        print(f"SUCCESS: PDF processed with {len(raw_pdf_elements)} elements")
+        
     except Exception as e:
-        if "tesseract" in str(e).lower():
-            print(f"WARNING: Tesseract OCR not available: {e}")
-            print("Falling back to basic text extraction without OCR...")
-            # Fallback to basic extraction without OCR
-            raw_pdf_elements = partition_pdf(
-                filename=file_path,
-                extract_images_in_pdf=False,  # Force disable image extraction
-                infer_table_structure=False,  # Disable table structure inference
-                chunking_strategy="by_title",
-                max_characters=max_char,
-                new_after_n_chars=new_after_n_chars,
-                combine_text_under_n_chars=combine,
-                strategy="fast"  # Use faster strategy without OCR
-            )
+        error_msg = str(e).lower()
+        if any(keyword in error_msg for keyword in ["libgl", "opencv", "tesseract", "yolox", "detectron", "unstructured"]):
+            print(f"WARNING: Advanced PDF libraries not available: {e}")
+            print("Falling back to simple PDF extraction...")
+            
+            # Use the simple fallback method
+            try:
+                from pdf_fallback import process_pdf_simple
+                simple_docs = process_pdf_simple(file_path, metadata, max_char)
+                print(f"SUCCESS: Simple fallback processing completed with {len(simple_docs)} documents")
+                return simple_docs
+            except Exception as fallback_error:
+                print(f"ERROR: Even simple PDF processing failed: {fallback_error}")
+                # Try one more time with basic unstructured
+                try:
+                    raw_pdf_elements = partition_pdf(
+                        filename=file_path,
+                        extract_images_in_pdf=False,
+                        infer_table_structure=False,
+                        chunking_strategy="by_title",
+                        max_characters=max_char,
+                        new_after_n_chars=new_after_n_chars,
+                        combine_text_under_n_chars=combine,
+                        strategy="fast"
+                    )
+                    print(f"SUCCESS: Basic unstructured processing completed with {len(raw_pdf_elements)} elements")
+                except Exception as final_error:
+                    print(f"ERROR: All PDF processing methods failed: {final_error}")
+                    raise final_error
         else:
+            print(f"ERROR: PDF processing failed: {e}")
             raise e
 
     # Create a dictionary to store counts of each type
