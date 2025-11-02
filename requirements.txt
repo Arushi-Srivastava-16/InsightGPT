@@ -15,7 +15,6 @@ ollama
 
 # Database & vector stores
 neo4j
-chromadb
 
 # PDF processing (Streamlit Cloud compatible)
 # Use fallback libraries first to avoid unstructured conflicts

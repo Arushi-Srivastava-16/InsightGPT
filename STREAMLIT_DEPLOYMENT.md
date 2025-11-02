@@ -94,6 +94,7 @@ streamlit run src/ui/app_single_page.py
 
 ## What Was Fixed
 
+### Fix 1: Neo4j Connection Error
 The original error was caused by:
 1. Neo4j connection being initialized at import time
 2. Environment variables not being set before import
@@ -103,3 +104,12 @@ The fix:
 2. Added Streamlit secrets support to config loader
 3. Deferred initialization until actually needed
 4. Added proper error handling for missing connections
+
+### Fix 2: Dependency Installation Error
+Additional issues fixed:
+1. **Removed problematic system packages**: Streamlined `packages.txt` to only essential libraries
+2. **Made unstructured optional**: The `unstructured[pdf]` library can cause install issues, so it's now optional with graceful fallback
+3. **Fixed import errors**: Updated imports to use `langchain_core.documents` instead of deprecated `langchain.schema`
+4. **Improved PDF fallback**: Enhanced the fallback mechanism to work even when unstructured is not available
+
+The app now uses simpler PDF processing libraries (PyMuPDF, pypdf, pdfminer.six) that work reliably on Streamlit Cloud.
