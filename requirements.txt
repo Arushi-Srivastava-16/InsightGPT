@@ -9,6 +9,7 @@ langchain-core
 langchain-experimental
 langchain-openai
 langchain-neo4j
+langchain-text-splitters
 
 # Database & vector stores
 neo4j

@@ -7,7 +7,7 @@ from pathlib import Path
 from configparser import ConfigParser
 from typing import List, Dict, Any
 from langchain_core.documents import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import PromptTemplate
 from langchain.chains.summarize import load_summarize_chain
 from langchain.chains import MapReduceDocumentsChain, ReduceDocumentsChain, StuffDocumentsChain
