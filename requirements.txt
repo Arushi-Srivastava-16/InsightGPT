@@ -10,9 +10,6 @@ langchain-experimental
 langchain-openai
 langchain-neo4j
 
-# LLM providers
-ollama
-
 # Database & vector stores
 neo4j
 
@@ -27,9 +24,6 @@ ml-dtypes>=0.5.0
 
 # Data processing
 json_repair
-
-# Reference management
-pyzotero
 
 # Visualization (for Streamlit app)
 streamlit
