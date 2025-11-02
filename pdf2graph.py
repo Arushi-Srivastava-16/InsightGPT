@@ -11,7 +11,12 @@ from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplat
 from langchain_experimental.graph_transformers import LLMGraphTransformer
 from langchain_experimental.graph_transformers.llm import UnstructuredRelation
 from langchain_core.messages import SystemMessage
-from unstructured.partition.pdf import partition_pdf
+try:
+    from unstructured.partition.pdf import partition_pdf
+    UNSTRUCTURED_AVAILABLE = True
+except ImportError:
+    UNSTRUCTURED_AVAILABLE = False
+    print("WARNING: unstructured library not available. Will use fallback PDF processing.")
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_community.graphs import Neo4jGraph
 from langchain_community.graphs.graph_document import GraphDocument, Node, Relationship
@@ -98,6 +103,12 @@ def exterat_elements_from_pdf(file_path: str,
                               max_char: int = 1000, 
                               new_after_n_chars: int = 800,
                               combine: int = 200,) -> List[Document]:
+    
+    # If unstructured is not available, use fallback immediately
+    if not UNSTRUCTURED_AVAILABLE:
+        print("INFO: Unstructured not available, using simple PDF extraction")
+        from pdf_fallback import process_pdf_simple
+        return process_pdf_simple(file_path, metadata, max_char)
     
     # Check if we're running on Streamlit Cloud (or similar environment)
     import os

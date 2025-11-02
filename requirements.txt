@@ -22,13 +22,9 @@ chromadb
 pymupdf>=4.21.0
 pypdf>=3.0.0
 pdfminer.six
-# Unstructured is optional, will fallback if not available
-unstructured[pdf]
 ml-dtypes>=0.5.0
-
-# Image processing & OCR (Streamlit Cloud compatible)
-opencv-python-headless>=4.8.0.76
-pytesseract
+# Unstructured is optional for now - can cause install issues
+# unstructured[pdf]
 
 # Data processing
 json_repair

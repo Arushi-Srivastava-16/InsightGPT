@@ -5,7 +5,7 @@ Uses only basic libraries that work in cloud environments
 
 import os
 from typing import List
-from langchain.schema import Document
+from langchain_core.documents import Document
 import tempfile
 
 def simple_pdf_extract(file_path: str, metadata: dict, max_char: int = 1000) -> List[Document]:
