@@ -87,8 +87,12 @@ except Exception as e:
 
 # Retriever
 
-graph.query(
-    "CREATE FULLTEXT INDEX entity IF NOT EXISTS FOR (e:__Entity__) ON EACH [e.id]")
+try:
+    graph.query(
+        "CREATE FULLTEXT INDEX entity IF NOT EXISTS FOR (e:__Entity__) ON EACH [e.id]")
+except Exception as e:
+    # Index creation can fail if database is not available or index already exists
+    print(f"Warning: Could not create fulltext index: {e}")
 
 # Extract entities from text
 class Entities(BaseModel):
