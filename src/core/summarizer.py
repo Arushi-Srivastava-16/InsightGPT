@@ -9,8 +9,6 @@ from typing import List, Dict, Any
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import PromptTemplate
-from langchain.chains.summarize import load_summarize_chain
-from langchain.chains import MapReduceDocumentsChain, ReduceDocumentsChain, StuffDocumentsChain
 from langchain_core.output_parsers import StrOutputParser
 from langchain_neo4j import Neo4jGraph
 from src.utils.config_loader import (
@@ -148,17 +146,22 @@ Final Summary:""",
         if len(split_docs) > 12:
             split_docs = split_docs[:12]
 
-        # Use LangChain's load_summarize_chain with map_reduce
-        chain = load_summarize_chain(
-            self.llm,
-            chain_type="map_reduce",
-            map_prompt=self.map_prompt,
-            combine_prompt=self.reduce_prompt,
-            verbose=False
-        )
+        # Use LangChain's LCEL for map-reduce summarization
+        # Map phase: summarize each chunk
+        map_chain = self.map_prompt | self.llm | StrOutputParser()
         
-        summary = chain.invoke(split_docs)
-        return summary.get('output_text', str(summary))
+        # Process each document
+        summaries = []
+        for doc in split_docs:
+            summary = map_chain.invoke({"text": doc.page_content})
+            summaries.append(summary)
+        
+        # Combine all summaries
+        combined_text = "\n\n".join(summaries)
+        reduce_chain = self.reduce_prompt | self.llm | StrOutputParser()
+        final_summary = reduce_chain.invoke({"text": combined_text})
+        
+        return final_summary
     
     def summarize_from_graph(self, paper_title: str = None, source: str = None) -> str:
         """
